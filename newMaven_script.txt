@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# ==========================
+# Install Java (OpenJDK 11+), Git, and Maven
+# ==========================
+
+echo "🚀 Starting setup..."
+
+# 1. Set hostname (optional)
+sudo hostnamectl set-hostname maven
+
+# 2. Switch to ec2-user (only runs if not already ec2-user)
+if [ "$(whoami)" != "ec2-user" ]; then
+    sudo su - ec2-user
+fi
+
+# 3. Go to /opt directory
+cd /opt
+
+# 4. Install prerequisites
+sudo yum install wget tree unzip git-all -y
+
+# 5. Install Java (OpenJDK 11 + OpenJDK 8 as fallback)
+sudo yum install java-11-openjdk-devel java-1.8.0-openjdk-devel -y
+
+# 6. Configure system to always use Java 11
+sudo alternatives --install /usr/bin/java java /usr/lib/jvm/java-11-openjdk-*/bin/java 1
+sudo alternatives --install /usr/bin/javac javac /usr/lib/jvm/java-11-openjdk-*/bin/javac 1
+sudo alternatives --set java /usr/lib/jvm/java-11-openjdk-*/bin/java
+sudo alternatives --set javac /usr/lib/jvm/java-11-openjdk-*/bin/javac
+
+# 7. Verify Java version
+java -version
+javac -version
+
+# 8. Check Git version
+git --version
+
+# ==========================
+# Install Maven
+# ==========================
+MAVEN_VERSION=3.9.11
+
+sudo wget https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.zip
+sudo unzip apache-maven-${MAVEN_VERSION}-bin.zip
+sudo rm -rf apache-maven-${MAVEN_VERSION}-bin.zip
+sudo mv apache-maven-${MAVEN_VERSION} maven
+
+echo "🎯 Maven installation complete!"
+echo "👉 Remember to set JAVA_HOME and M2_HOME in ~/.bash_profile"

@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Swap file size in GB
+SWAP_SIZE=3
+SWAPFILE="/swapfile"
+
+echo "Creating ${SWAP_SIZE}G swap file at ${SWAPFILE}..."
+
+# Create the swap file using fallocate
+sudo fallocate -l ${SWAP_SIZE}G ${SWAPFILE}
+
+# If fallocate fails, fallback to dd
+if [ $? -ne 0 ]; then
+  echo "fallocate failed, using dd instead..."
+  sudo dd if=/dev/zero of=${SWAPFILE} bs=1M count=$((${SWAP_SIZE} * 1024))
+fi
+# Set correct permissions
+sudo chmod 600 ${SWAPFILE}
+
+# Format the file for swap
+sudo mkswap ${SWAPFILE}
+
+# Enable the swap file
+sudo swapon ${SWAPFILE}
+
+# Label it correctly for SELinux (if enabled)
+if command -v chcon &> /dev/null; then
+  sudo chcon --type=swapfile_t ${SWAPFILE}
+fi
+
+# Add to fstab for persistence
+echo "${SWAPFILE} swap swap defaults 0 0" | sudo tee -a /etc/fstab
+
+# Show memory and swap status
+echo "Swap has been set up. Current memory status:"
+free -h

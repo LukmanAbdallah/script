@@ -1,0 +1,50 @@
+#!/bin/sh
+# SonarQube 7.8 Setup Script (POSIX sh version)
+
+# Update system
+sudo yum update -y
+
+# Create sonar user (ignore if exists)
+id -u sonar >/dev/null 2>&1 || sudo useradd sonar
+
+# Give sonar user sudo without password
+echo "sonar ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/sonar
+
+# Set hostname
+sudo hostnamectl set-hostname sonar
+
+# Install required packages
+sudo yum install -y unzip wget git java-11-openjdk-devel
+
+# Switch to /opt
+cd /opt || exit 1
+
+# Download SonarQube 7.8 if not already downloaded
+if [ ! -f sonarqube-7.8.zip ]; then
+    sudo wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-7.8.zip
+fi
+
+# Extract SonarQube
+sudo unzip -o sonarqube-7.8.zip
+sudo rm -f sonarqube-7.8.zip
+
+# Rename folder if needed
+if [ -d sonarqube-7.8 ]; then
+    sudo mv -f sonarqube-7.8 sonarqube
+fi
+
+# Set permissions
+sudo chown -R sonar:sonar /opt/sonarqube
+sudo chmod -R 775 /opt/sonarqube
+
+# Start SonarQube as sonar user
+sudo -u sonar sh /opt/sonarqube/bin/linux-x86-64/sonar.sh start
+
+# Show status
+sudo -u sonar sh /opt/sonarqube/bin/linux-x86-64/sonar.sh status
+
+echo "======================================================"
+echo "SonarQube 7.8 has been installed and started."
+echo "Access it at: http://<your-server-ip>:9000"
+echo "Default login: admin / admin"
+echo "======================================================"

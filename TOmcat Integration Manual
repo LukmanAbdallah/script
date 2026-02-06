@@ -1,0 +1,139 @@
+DOCKER JENKINS TOMCAT & SLACK NOTIFICATION INTEGRATION:
+
+1. Build your Jenkins:
+docker run -d --name mytomcat -p 8006:8080 tomcat:9.0.109-jdk17-temurin
+
+2. Go into the Tomcat Environment:
+docker exec -it mytomcat bash
+
+3. Run this Command:
+cd /usr/local/tomcat
+cp -r webapps.dist/manager webapps/
+cp -r webapps.dist/host-manager webapps/
+exit
+
+4. Restart Docker:
+docker restart mytomcat
+
+5. Get into Docker Environment: 
+docker exec -it mytomcat bash
+
+6. Go and set up your user credentials:
+nano /usr/local/tomcat/conf/tomcat-users.xml
+
+<?xml version="1.0" encoding="UTF-8"?>
+<tomcat-users xmlns="http://tomcat.apache.org/xml"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://tomcat.apache.org/xml tomcat-users.xsd"
+              version="1.0">
+
+  <role rolename="manager-gui"/>
+  <role rolename="manager-script"/>
+
+  <!-- For logging into Tomcat UI -->
+  <user username="admin" password="admin123" roles="manager-gui"/>
+
+  <!-- For Jenkins deployment -->
+  <user username="jenkins" password="jenkins123" roles="manager-script"/>
+
+</tomcat-users>
+
+7. Restart Docker:
+docker restart mytomcat
+
+8. Go comment the Valve Tag:
+nano /usr/local/tomcat/webapps/manager/META-INF/context.xml
+
+9. Now Open the Tomcat UI and Set your username and Password
+
+
+🧩 Step 2 — Install the plugin
+In Jenkins UI:
+Go to Manage Jenkins → Plugins → Available plugins
+Search for Deploy to container
+Click Install without restart
+Wait till it finishes installing.
+
+Step 3 — Add credentials in Jenkins
+In Jenkins:
+Go to Manage Jenkins → Credentials → System → Global credentials (unrestricted)
+Click Add Credentials
+Kind: Username with password
+Username: (username in the tomcat-user)
+Password: (password in the tomcat-user)
+ID: tomcat-creds ← (important, we’ll use this in pipeline)
+Click Save ✅
+
+Step 4 — Reference your credentials ID and tomcat url inside your 
+pipeline
+
+
+
+pipeline {
+    agent any
+
+    environment {
+        WAR_FILE = 'target/linkpay.war'  // Adjust to your project WAR name
+        MAVEN_TOOL = 'maven3.9.11'
+    }
+
+    stages {
+        // Stage 1: Git Build
+        stage('1. Git Build') {
+            steps {
+                git branch: 'main', url: 'https://github.com/code9Bruno/pipeline1.git'
+            }
+        }
+
+        // Stage 2: Maven Build
+        stage('2. Maven Build') {
+            steps {
+                withMaven(maven: "${MAVEN_TOOL}") {
+                    sh "mvn clean package -Dmaven.test.skip=true"
+                }
+            }
+        }
+
+        // Stage 3: SonarQube Analysis (optional)
+        stage('3. SonarQube Analysis') {
+            steps {
+                echo "⏩ Skipping SonarQube analysis for now..."
+            }
+        }
+
+        // Stage 4: Deploy to Nexus (optional)
+        stage('4. Deploy to Nexus') {
+            steps {
+                echo "⏩ Skipping Nexus deployment for now..."
+            }
+        }
+
+        // ✅ Stage 5: tomcat-dev
+        stage('5. Deploy to Tomcat') {
+            steps {
+                echo "🚀 Deploying WAR to Tomcat via Manager API..."
+                deploy adapters: [
+                    tomcat9(
+                        credentialsId: 'tomcat-new',
+                        url: 'http://tomcat9:8080/'
+                    )
+                ],
+                contextPath: 'linkpay',
+                war: "${WAR_FILE}"
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+

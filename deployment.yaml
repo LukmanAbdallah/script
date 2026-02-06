@@ -1,0 +1,7 @@
+Types of Deployments:Deployment:
+	cp ---> when they are in the same server
+	github ---> clone
+	ftp ---> transfer between servers
+	upload -->
+	scp----->
+	nexus ---> wget

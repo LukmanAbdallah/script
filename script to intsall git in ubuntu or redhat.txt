@@ -1,0 +1,17 @@
+#! /usr/bin/bash
+<<new this script is going to install git in ubuntu
+and redhat
+new
+echo "Welcome to Git Command line interface Installer"
+echo "Installation has started"
+if [ "$(whoami)" = "ubuntu" ]
+then
+        echo "This is Ubuntu"
+        apt-get install git -y
+elif [ "$(whoami)" = "ec2-user" ]
+then
+        echo "this is Redhat"
+        yum install git -y
+else
+echo    "The Operating System does not match"
+fi

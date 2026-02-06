@@ -1,0 +1,44 @@
+#!/bin/bash
+
+echo "🚮 Cleaning Maven and Java from the system..."
+
+# 1. Remove Maven installation directory
+if [ -d "/opt/maven" ]; then
+    sudo rm -rf /opt/maven
+    echo "✅ Removed /opt/maven"
+else
+    echo "ℹ️ Maven directory not found at /opt/maven"
+fi
+
+# 2. Remove Maven environment variables from ec2-user's bash profile
+BASH_PROFILE="/home/ec2-user/.bash_profile"
+if grep -q "M2_HOME" "$BASH_PROFILE"; then
+    sudo sed -i '/M2_HOME/d' "$BASH_PROFILE"
+    sudo sed -i '/JAVA_HOME/d' "$BASH_PROFILE"
+    sudo sed -i '/Maven environment variables/d' "$BASH_PROFILE"
+    sudo sed -i '/PATH=\$JAVA_HOME\/bin:\$M2_HOME\/bin:\$PATH/d' "$BASH_PROFILE"
+    echo "✅ Removed Maven and Java environment variables from $BASH_PROFILE"
+fi
+
+# 3. Remove symbolic links (if any)
+if [ -L "/usr/local/bin/mvn" ]; then
+    sudo rm -f /usr/local/bin/mvn
+    echo "✅ Removed symbolic link /usr/local/bin/mvn"
+fi
+
+# 4. Remove Java (if not needed for other apps)
+echo "⚠️ Removing Java packages..."
+sudo yum remove -y java-11-openjdk-devel java-11-amazon-corretto-devel
+sudo yum autoremove -y
+
+# 5. Reload bash profile for ec2-user
+sudo -u ec2-user bash -c "source $BASH_PROFILE"
+
+# 6. Verify Maven removal
+if ! command -v mvn &> /dev/null; then
+    echo "✅ Maven successfully removed from the system."
+else
+    echo "❌ Maven still exists. Check manually."
+fi
+
+echo "🧹 Cleanup completed!"

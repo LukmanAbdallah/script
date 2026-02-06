@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# =======================
+# Maven + Tomcat Installer with Auto-Deploy
+# =======================
+
+MAVEN_VERSION=3.9.11
+TOMCAT_VERSION=9.0.86
+TOMCAT_DIR=/opt/tomcat9
+BASH_PROFILE="/home/ec2-user/.bash_profile"
+APP_DIR="/home/ec2-user/javawebApp3"  # Change this if your repo folder name is different
+
+echo "🚀 Starting Maven + Tomcat installation..."
+
+# Set hostname (optional)
+sudo hostnamectl set-hostname java-server
+
+# Fix /etc/hosts to avoid hostname resolution errors
+if ! grep -q "java-server" /etc/hosts; then
+    echo "127.0.0.1   java-server" | sudo tee -a /etc/hosts
+fi
+
+# Update system and install prerequisites
+sudo yum update -y
+sudo yum install wget tree unzip git-all -y
+
+# Install Java 11
+if sudo yum install -y java-11-openjdk-devel; then
+    echo "✅ OpenJDK 11 installed successfully."
+else
+    echo "⚠️ OpenJDK 11 install failed. Installing Amazon Corretto 11..."
+    sudo yum install -y java-11-amazon-corretto-devel
+    echo "✅ Amazon Corretto installed."
+fi
+
+# Detect Java path
+JAVA_PATH=$(dirname $(dirname $(readlink -f $(which java))))
+echo "📍 Detected JAVA_HOME: $JAVA_PATH"
+
+# -----------------------
+# Install Maven
+# -----------------------
+cd /opt
+sudo wget https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.zip
+sudo unzip apache-maven-${MAVEN_VERSION}-bin.zip
+sudo rm -f apache-maven-${MAVEN_VERSION}-bin.zip
+sudo mv apache-maven-${MAVEN_VERSION} /opt/maven
+echo "✅ Maven installed at /opt/maven"
+
+# -----------------------
+# Install Tomcat
+# -----------------------
+sudo wget https://archive.apache.org/dist/tomcat/tomcat-9/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.zip
+sudo unzip apache-tomcat-${TOMCAT_VERSION}.zip
+sudo rm -f apache-tomcat-${TOMCAT_VERSION}.zip
+sudo mv apache-tomcat-${TOMCAT_VERSION} $TOMCAT_DIR
+sudo chmod -R 777 $TOMCAT_DIR
+sudo chown -R ec2-user:ec2-user $TOMCAT_DIR
+echo "✅ Tomcat installed at $TOMCAT_DIR"
+
+# Create Tomcat start/stop shortcuts
+sudo ln -sf $TOMCAT_DIR/bin/startup.sh /usr/local/bin/tomcatup
+sudo ln -sf $TOMCAT_DIR/bin/shutdown.sh /usr/local/bin/tomcatdown
+
+# -----------------------
+# Update Environment Variables
+# -----------------------
+{
+    echo ""
+    echo "# Java, Maven, and Tomcat environment variables"
+    echo "export JAVA_HOME=$JAVA_PATH"
+    echo "export M2_HOME=/opt/maven"
+    echo "export CATALINA_HOME=$TOMCAT_DIR"
+    echo 'export PATH=$JAVA_HOME/bin:$M2_HOME/bin:$CATALINA_HOME/bin:$PATH'
+} | sudo tee -a $BASH_PROFILE > /dev/null
+
+# Apply for ec2-user immediately
+sudo chown ec2-user:ec2-user $BASH_PROFILE
+sudo -u ec2-user bash -c "source $BASH_PROFILE && echo '✅ Environment reloaded for ec2-user'"
+
+# -----------------------
+# Auto-Deploy Maven Project
+# -----------------------
+if [ -d "$APP_DIR" ]; then
+    echo "📦 Building project from $APP_DIR..."
+    cd $APP_DIR
+    sudo -u ec2-user bash -c "cd $APP_DIR && source $BASH_PROFILE && mvn clean package"
+
+    WAR_FILE=$(find target -name "*.war" | head -n 1)
+    if [ -f "$WAR_FILE" ]; then
+        echo "📤 Deploying $WAR_FILE to Tomcat..."
+        sudo cp "$WAR_FILE" $TOMCAT_DIR/webapps/
+    else
+        echo "❌ No WAR file found in target/. Build may have failed."
+    fi
+else
+    echo "⚠️ Project directory $APP_DIR not found. Skipping auto-deploy."
+fi
+
+# -----------------------
+# Start Tomcat
+# -----------------------
+echo "🚀 Starting Tomcat..."
+sudo -u ec2-user bash -c "source $BASH_PROFILE && tomcatup"
+
+echo "🎯 Installation + Deployment complete!"
+echo "➡ App URL: http://<your-server-ip>:8080/$(basename "$WAR_FILE" .war)"

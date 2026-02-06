@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# =======================
+# Tomcat Installation Script
+# =======================
+
+TOMCAT_VERSION=9.0.86
+TOMCAT_DIR=/opt/tomcat9
+HOST_NAME=tomcat
+
+# Set hostname
+sudo hostnamectl set-hostname $HOST_NAME
+
+# Fix /etc/hosts to avoid sudo hostname resolution errors
+if ! grep -q "$HOST_NAME" /etc/hosts; then
+    echo "127.0.0.1   $HOST_NAME" | sudo tee -a /etc/hosts
+fi
+
+# Update system and install prerequisites
+sudo yum update -y
+sudo yum install wget unzip git-all -y
+
+# Try installing OpenJDK 11 (Tomcat 9 supports Java 8+)
+if sudo yum install -y java-11-openjdk-devel; then
+    JAVA_PATH="/usr/lib/jvm/java-11-openjdk"
+    echo "✅ OpenJDK 11 installed successfully."
+else
+    echo "⚠️ OpenJDK 11 install failed. Installing Amazon Corretto 11 instead..."
+    sudo yum install -y java-11-amazon-corretto-devel
+    JAVA_PATH="/usr/lib/jvm/java-11-amazon-corretto"
+    echo "✅ Amazon Corretto installed."
+fi
+
+# Go to /opt directory
+cd /opt
+
+# Download and extract Tomcat
+sudo wget https://archive.apache.org/dist/tomcat/tomcat-9/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.zip
+sudo unzip apache-tomcat-${TOMCAT_VERSION}.zip
+sudo rm -f apache-tomcat-${TOMCAT_VERSION}.zip
+sudo mv apache-tomcat-${TOMCAT_VERSION} $TOMCAT_DIR
+
+# Set permissions
+sudo chmod -R 777 $TOMCAT_DIR
+sudo chown -R ec2-user:ec2-user $TOMCAT_DIR
+
+# Create start/stop shortcuts
+sudo ln -sf $TOMCAT_DIR/bin/startup.sh /usr/local/bin/tomcatup
+sudo ln -sf $TOMCAT_DIR/bin/shutdown.sh /usr/local/bin/tomcatdown
+
+# Set environment variables for ec2-user
+BASH_PROFILE="/home/ec2-user/.bash_profile"
+
+echo "" >> $BASH_PROFILE
+echo "# Java and Tomcat environment variables" >> $BASH_PROFILE
+echo "export JAVA_HOME=$JAVA_PATH" >> $BASH_PROFILE
+echo "export CATALINA_HOME=$TOMCAT_DIR" >> $BASH_PROFILE
+echo 'export PATH=$JAVA_HOME/bin:$CATALINA_HOME/bin:$PATH' >> $BASH_PROFILE
+
+# Apply changes for ec2-user
+sudo chown ec2-user:ec2-user $BASH_PROFILE
+sudo -u ec2-user bash -c "source $BASH_PROFILE"
+
+# Start Tomcat
+sh $TOMCAT_DIR/bin/startup.sh
+
+echo "✅ Tomcat $TOMCAT_VERSION installation complete!"
+echo "Start Tomcat: tomcatup"
+echo "Stop Tomcat: tomcatdown"
+echo "Access at: http://<your-server-ip>:8080"

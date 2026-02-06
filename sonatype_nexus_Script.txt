@@ -1,0 +1,42 @@
+Nexus Installation: 
+https://github.com/ayafor-code/Nexus-Installation.git
+
+Installation Script:
+sudo hostnamectl set-hostname nexus
+sudo useradd nexus
+sudo echo "nexus ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/nexus 
+sudo su - nexus
+cd /opt
+sudo yum install wget git nano unzip -y
+sudo yum install java-11-openjdk-devel java-1.8.0-openjdk-devel -y
+sudo wget https://download.sonatype.com/nexus/3/nexus-3.82.0-08-linux-x86_64.tar.gz
+sudo tar -zxvf nexus-3.82.0-08-linux-x86_64.tar.gz
+sudo mv /opt/nexus-3.82.0-08 /opt/nexus
+sudo rm -rf nexus-3.82.0-08-linux-x86_64.tar.gz
+sudo chown -R nexus:nexus /opt/nexus
+sudo chown -R nexus:nexus /opt/sonatype-work
+sudo chmod -R 775 /opt/nexus
+sudo chmod -R 775 /opt/sonatype-work
+vi /opt/nexus/bin/nexus   # add user nexus
+cd /opt/nexus/bin
+
+./nexus start
+
+
+<server>
+        <id>nexus</id>
+        <username>admin</username>
+        <password>admin123</password>
+      </server>
+
+
+deploy adapters: [tomcat9(alternativeDeploymentContext: '', credentialsId: 'tomcat_deploy', path: '', url: 'http://3.82.207.230:8080/')], contextPath: null, war: 'target/*war'
+
+Default Port: 8081
+Default User: admin
+Password: cat /opt/sonatype-work/nexus3/admin.password
+ 
+  Pre-requisite:
+Create Redhat EC2 t2.medium Instance with 4GB RAM.
+Create Security Group and open Required ports.
+8081
